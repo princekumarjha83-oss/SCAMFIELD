@@ -1,5 +1,13 @@
 # ScamShield AI 🛡️
 
+[![Live Platform](https://img.shields.io/badge/Live%20Platform-scamfield--9pin.vercel.app-00f2fe?style=for-the-badge&logo=vercel)](https://scamfield-9pin.vercel.app)
+[![Backend API](https://img.shields.io/badge/Backend%20API-scamfield.onrender.com-4facfe?style=for-the-badge&logo=fastapi)](https://scamfield.onrender.com/api/v1/health)
+[![API Documentation](https://img.shields.io/badge/Swagger%20Docs-Interactive%20API-emerald?style=for-the-badge&logo=swagger)](https://scamfield.onrender.com/docs)
+
+> 🌐 **Live Web Application**: **[https://scamfield-9pin.vercel.app](https://scamfield-9pin.vercel.app)**  
+> ⚡ **Production API & Health**: **[https://scamfield.onrender.com/api/v1/health](https://scamfield.onrender.com/api/v1/health)**  
+> 📖 **Interactive Swagger Docs**: **[https://scamfield.onrender.com/docs](https://scamfield.onrender.com/docs)**
+
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688.svg)](https://fastapi.tiangolo.com/)
 [![React 19](https://img.shields.io/badge/React-19.2-61DAFB.svg)](https://react.dev/)
