@@ -3,7 +3,10 @@
  * Provides safe HTTP communication for Message, URL, Screenshot, and Email threat analysis.
  */
 
-const API_BASE = import.meta.env.VITE_API_BASE || '/api/v1';
+const rawBase = import.meta.env.VITE_API_BASE || import.meta.env.VITE_API_BASE_URL || '';
+const API_BASE = rawBase 
+  ? (rawBase.endsWith('/api/v1') ? rawBase : `${rawBase.replace(/\/+$/, '')}/api/v1`)
+  : '/api/v1';
 
 async function fetchJson(endpoint, options = {}) {
   const url = `${API_BASE}${endpoint}`;
