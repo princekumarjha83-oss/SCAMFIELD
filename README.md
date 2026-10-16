@@ -1,61 +1,44 @@
 # ScamShield AI 🛡️
+### *Enterprise Multi-Modal Threat Intelligence & Scam Detection Platform*
 
-[![Live Platform](https://img.shields.io/badge/Live%20Platform-scamfield--9pin.vercel.app-00f2fe?style=for-the-badge&logo=vercel)](https://scamfield-9pin.vercel.app)
-[![Backend API](https://img.shields.io/badge/Backend%20API-scamfield.onrender.com-4facfe?style=for-the-badge&logo=fastapi)](https://scamfield.onrender.com/api/v1/health)
-[![API Documentation](https://img.shields.io/badge/Swagger%20Docs-Interactive%20API-emerald?style=for-the-badge&logo=swagger)](https://scamfield.onrender.com/docs)
+<p align="center">
+  <a href="https://scamfield-9pin.vercel.app">
+    <img src="https://img.shields.io/badge/🌐_Live_Platform-scamfield--9pin.vercel.app-00f2fe?style=for-the-badge&logo=vercel&logoColor=black" alt="Live Demo" />
+  </a>
+  <a href="https://scamfield.onrender.com/api/v1/health">
+    <img src="https://img.shields.io/badge/⚡_Production_API-scamfield.onrender.com-4facfe?style=for-the-badge&logo=fastapi&logoColor=white" alt="API Health" />
+  </a>
+  <a href="https://scamfield.onrender.com/docs">
+    <img src="https://img.shields.io/badge/📖_Interactive_Docs-Swagger_OpenAPI-10b981?style=for-the-badge&logo=swagger&logoColor=white" alt="Swagger Docs" />
+  </a>
+</p>
 
-> 🌐 **Live Web Application**: **[https://scamfield-9pin.vercel.app](https://scamfield-9pin.vercel.app)**  
-> ⚡ **Production API & Health**: **[https://scamfield.onrender.com/api/v1/health](https://scamfield.onrender.com/api/v1/health)**  
-> 📖 **Interactive Swagger Docs**: **[https://scamfield.onrender.com/docs](https://scamfield.onrender.com/docs)**
-
-[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688.svg)](https://fastapi.tiangolo.com/)
-[![React 19](https://img.shields.io/badge/React-19.2-61DAFB.svg)](https://react.dev/)
-[![Scikit-Learn](https://img.shields.io/badge/Scikit--Learn-1.7%2B-F7931E.svg)](https://scikit-learn.org/)
-[![Native Windows OCR](https://img.shields.io/badge/OCR-Native%20Windows%20Media%20OCR-0078D7.svg)](https://learn.microsoft.com/en-us/uwp/api/windows.media.ocr)
-[![Tests: Pytest (14/14)](https://img.shields.io/badge/Pytest-14%2F14%20Passing-success.svg)](#automated-testing)
-[![Tests: Vitest (5/5)](https://img.shields.io/badge/Vitest-5%2F5%20Passing-success.svg)](#automated-testing)
-
-**ScamShield AI** is an enterprise-grade, defense-in-depth phishing and scam detection intelligence platform. Combining a trained **Scikit-learn Random Forest URL classifier**, an **explainable NLP & heuristic scam intelligence engine**, and a **Native Windows Media OCR extraction pipeline**, ScamShield detects threats across four distinct communication vectors—**without ever executing untrusted code or initiating SSRF outbound network connections**.
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python" />
+  <img src="https://img.shields.io/badge/FastAPI-0.110%2B-009688?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI" />
+  <img src="https://img.shields.io/badge/React-19.2-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React" />
+  <img src="https://img.shields.io/badge/Vite-8.3-646CFF?style=flat-square&logo=vite&logoColor=white" alt="Vite" />
+  <img src="https://img.shields.io/badge/Scikit--Learn-1.7-F7931E?style=flat-square&logo=scikitlearn&logoColor=white" alt="Scikit-Learn" />
+  <img src="https://img.shields.io/badge/OCR-Native_Windows_Media_OCR-0078D7?style=flat-square&logo=windows&logoColor=white" alt="OCR" />
+  <img src="https://img.shields.io/badge/Tests-14%2F14_Pytest_Passing-success?style=flat-square&logo=pytest&logoColor=white" alt="Pytest" />
+  <img src="https://img.shields.io/badge/Tests-5%2F5_Vitest_Passing-success?style=flat-square&logo=vitest&logoColor=white" alt="Vitest" />
+  <img src="https://img.shields.io/badge/Security-Zero_SSRF_Safeguard-emerald?style=flat-square" alt="Zero SSRF" />
+  <img src="https://img.shields.io/badge/License-MIT-gray?style=flat-square" alt="License" />
+</p>
 
 ---
 
-## 🚀 Key Scanning Modalities
+## 📌 Executive Overview
 
-### 1. 💬 Message & SMS Scanner (`POST /api/v1/scan/message`)
-- **Input**: Raw text, SMS alerts, WhatsApp/Telegram chat logs, extortion notes.
-- **Analysis Engine**: Deep regex and NLP heuristic engine with explainable intent classification:
-  - **Artificial Urgency & Coercive Deadlines** (e.g. *"within 24 hours"*, *"immediate arrest"*, *"final notice"*)
-  - **High-Profile Impersonation** (Wells Fargo, Chase, IRS, PayPal, Amazon, GeekSquad, law enforcement)
-  - **Credential Harvesting Patterns** (passwords, 2FA/MFA OTPs, seed phrases, PINs)
-  - **Financial Extortion & Fraud** (gift cards, wire transfers, crypto address lures, fake refund disputes)
-  - **Embedded Malicious Links** (inspects embedded URLs for high-abuse TLDs and brand mismatch)
-- **Output**: Threat score (0–100), intent category, categorized indicators with matched regex evidence, and recommended defensive actions.
+**ScamShield AI** is a defense-in-depth cybersecurity SaaS platform engineered to triage, detect, and explain phishing campaigns, social engineering attacks, and credential harvesting lures across four distinct communication vectors: **Messages/SMS**, **URLs**, **Screenshots (OCR)**, and **Emails**.
 
-### 2. 🌐 URL Phishing Scanner (`POST /api/v1/scan/url` & `POST /api/v1/scan`)
-- **Input**: Complete HTTP/HTTPS URL.
-- **Analysis Engine**: Dual threat inspection core combining:
-  - **Scikit-learn Random Forest Classifier** (`ml/artifacts/phishing_model.joblib`) trained on 995 verified phishing & benign samples.
-  - **Deterministic Lexical Heuristics**: Shannon entropy calculation, brand masquerading in hostnames, direct IP addresses, `@` authority obfuscation, high-abuse TLDs (`.xyz`, `.top`, `.icu`, etc.), dot count, and subdomain nesting depth.
-- **Defensive Guarantee**: **Zero SSRF** — The server never visits, fetches, resolves DNS, or loads remote endpoints.
+Traditional scanners rely on risky dynamic page fetches that can trigger malware downloads or alert attackers via DNS canary tokens. ScamShield AI is architected on a strict **Zero-SSRF (Server-Side Request Forgery) invariant**: all URL and text analyses are conducted exclusively offline using mathematical entropy, trained machine learning, optical character extraction, and explainable deterministic heuristics.
 
-### 3. 📸 Screenshot & Image OCR Scanner (`POST /api/v1/scan/screenshot`)
-- **Input**: Multipart image upload (PNG, JPG, JPEG, WEBP, BMP up to 5MB) via drag-and-drop or file browser.
-- **Analysis Engine**:
-  - Image validation and dimension verification via Pillow.
-  - **Native Windows Media OCR engine (`winocr`)** extracting legible visual text with bounding boxes and line counts.
-  - Graceful fallback for non-Windows platforms (pytesseract).
-  - NLP scam pipeline analyzes the extracted text for deceptive urgency, credential lures, and impersonation.
-- **Output**: Image metadata, extracted OCR text preview with line numbers, threat classification, and specific warning indicators.
-
-### 4. ✉️ Email Phishing & Spoofing Scanner (`POST /api/v1/scan/email`)
-- **Input**: Sender (`From` header), Subject line, and Email Body (or raw RFC 822 format).
-- **Analysis Engine**:
-  - **Sender Display Name Mismatch / Free-Webmail Spoofing**: Flags enterprise brand claims originating from free webmail domains (e.g., `PayPal Security <billing-notice@gmail.com>`).
-  - **Subject Line Urgency & Coercion**: Detects high-pressure cues and artificial deadlines.
-  - **Suspicious Attachment References**: Identifies mentions of risky file formats (`.zip`, `.exe`, `.scr`, `.vbs`, `.iso`).
-  - **Embedded URL Extraction**: Finds and scores all links in the email body.
-- **Cryptographic Disclaimer**: Explicitly identifies whether cryptographic SPF/DKIM/DMARC signatures and physical attachments were evaluated.
+### 🔗 Public Deployments
+- 🖥️ **Live Web Application**: [https://scamfield-9pin.vercel.app](https://scamfield-9pin.vercel.app)
+- 🔌 **Production Cloud API**: [https://scamfield.onrender.com](https://scamfield.onrender.com)
+- 📊 **API Health Probe**: [https://scamfield.onrender.com/api/v1/health](https://scamfield.onrender.com/api/v1/health)
+- 📑 **Interactive OpenAPI Documentation**: [https://scamfield.onrender.com/docs](https://scamfield.onrender.com/docs)
 
 ---
 
@@ -63,170 +46,275 @@
 
 ```mermaid
 flowchart TD
-    subgraph Client ["Client Layer (React 19 + Three.js / CSS 3D + Vite)"]
-        UI[SOC Cybersecurity Dashboard]
-        MS[Message / SMS Scanner]
-        US[URL Lexical Scanner]
-        SS[Screenshot OCR Scanner]
-        ES[Email Spoofing Scanner]
-        TA[Threat Telemetry & Analytics]
+    subgraph Client ["Client Layer — React 19 + Three.js / CSS 3D + Vite"]
+        UI[Security Operations Center Dashboard]
+        MS[Message & SMS Threat Scanner]
+        US[URL Lexical & Entropy Scanner]
+        SS[Screenshot Image OCR Scanner]
+        ES[Email Phishing & Spoofing Scanner]
+        TA[Threat Telemetry & Real Analytics]
         SH[Audit History & Modality Filter]
         MP[Model Provenance & Evaluation]
-        SA[Security Academy Guide]
+        SA[Defensive Security Academy]
         UI --> MS & US & SS & ES & TA & SH & MP & SA
     end
 
-    subgraph Gateway ["API & Security Gateway (FastAPI)"]
-        RL[SlowAPI Rate Limiter]
-        CORS[Restricted CORS Policy]
-        VAL[Pydantic v2 Syntax Validator]
-        SAN[Privacy-Safe Sanitizer & SHA-256 Hasher]
+    subgraph Gateway ["API & Security Gateway — FastAPI / Uvicorn"]
+        RL[SlowAPI Rate Limiter - 30/min]
+        CORS[CORS Gateway & Origin Regex Filter]
+        VAL[Pydantic v2 Strict Schema Validator]
+        SAN[Privacy Sanitizer & SHA-256 Hasher]
         RL --> CORS --> VAL --> SAN
     end
 
-    subgraph Engines ["Multi-Modal Threat Core"]
+    subgraph Engines ["Multi-Modal Threat Engine Core"]
         NLP[NLP & Regex Scam Engine]
+        ML[Scikit-Learn Random Forest Model]
         OCR[Native Windows Media OCR / Pillow]
-        ML[Scikit-learn Random Forest Classifier]
-        EMAIL[RFC 822 Header & Spoof Parser]
+        EMAIL[RFC 822 Header & Brand Spoof Engine]
         AGG[Composite Threat Score Aggregator]
-        SAN --> NLP & OCR & ML & EMAIL
-        NLP & OCR & ML & EMAIL --> AGG
+        SAN --> NLP & ML & OCR & EMAIL
+        NLP & ML & OCR & EMAIL --> AGG
     end
 
-    subgraph DataStore ["Persistence & Provenance"]
+    subgraph Persistence ["Persistence & Audit Datastore"]
         DB[(SQLAlchemy Engine: SQLite / PostgreSQL)]
         ART[ml/artifacts: Model & Metrics]
         AGG --> DB
         ML -.-> ART
     end
 
-    UI <-->|REST / JSON| Gateway
+    UI <-->|HTTPS / JSON / Multi-Part| Gateway
 ```
 
 ---
 
-## 🛡️ Defensive Engineering Invariants
+## 🚀 The 4 Core Threat Scanning Modalities
 
-1. **Zero Outbound Network Connections (No SSRF)**:
-   The backend inspects submitted links exclusively via **offline lexical and mathematical static analysis**. It never initiates HTTP/HTTPS requests, socket handshakes, or browser emulation against submitted URLs.
-2. **Native Windows Media OCR**:
-   Performs OCR using the fast, local Windows 10/11 built-in OCR subsystem via `winocr`, avoiding slow cloud APIs or external data transfer.
+All four threat analysis modalities are fully functional on both backend and frontend:
+
+| Modality | Endpoint | Input Vector | Engine & Detection Logic | Output Telemetry |
+|---|---|---|---|---|
+| **1. Message Scanner** | `POST /api/v1/scan/message` | SMS, chat transcripts, extortion text (up to 10k chars) | Explainable NLP intent classifier detecting artificial deadlines, institutional masquerade (IRS, Wells Fargo, GeekSquad), OTP harvesting, and financial extortion. | Threat score (0–100), intent category, regex evidence, checklist of defensive actions. |
+| **2. URL Scanner** | `POST /api/v1/scan/url` | Complete HTTP/HTTPS URL strings | Zero-SSRF offline lexical engine combined with a trained **Scikit-learn Random Forest** model (22 features), Shannon domain entropy, subdomain nesting, and direct IP checks. | ML probability, confidence rating, lexical metrics table, suspicious TLD detection. |
+| **3. Screenshot Scanner** | `POST /api/v1/scan/screenshot` | Multipart image upload (PNG, JPG, WEBP, BMP ≤ 5MB) | Pillow validation + **Native Windows Media OCR (`winocr`)** in isolated worker thread, extracting legible text lines followed by full threat classification. | Extracted raw text preview, line counter, detected lures, image dimensions, threat score. |
+| **4. Email Scanner** | `POST /api/v1/scan/email` | From header, Subject line, Body (or raw RFC 822) | Detects free-webmail brand masquerading (e.g., `PayPal Alerts <support@gmail.com>`), subject urgency triggers, dangerous attachment lures (`.zip`, `.exe`), and embedded links. | Spoof warnings, parsed header preview, disclaimer on cryptographic signatures (SPF/DKIM). |
+
+---
+
+## 🛡️ Core Defensive Invariants
+
+1. **Zero Outbound Connections (No SSRF)**:
+   The backend never initiates HTTP/HTTPS requests, socket handshakes, or browser emulation against target URLs. This eliminates Server-Side Request Forgery, malware beaconing, IP fingerprinting, and remote code execution vulnerabilities.
+2. **Native Windows Media OCR Subsystem**:
+   Executes OCR locally on Windows 10/11 using hardware-accelerated Windows Media OCR via `winocr`, running in a dedicated `ThreadPoolExecutor` to eliminate asyncio event loop collisions.
 3. **Privacy-Preserving Audit Logging**:
-   Query parameters, potential authentication tokens, and user credentials present in scanned content are stripped in server logs. Audits index target links via a cryptographic **SHA-256 digest**.
-4. **Transparent Probabilistic Disclaimer**:
-   Every API response and UI view prominently emphasizes that classifications are **statistical heuristic risk estimates**, not legal guarantees.
+   Query parameters, auth tokens, and sensitive strings are redacted from server logs. Historical records index target inputs via a cryptographic **SHA-256 digest**.
+4. **Transparent Probabilistic AI Disclaimer**:
+   Every API response and UI view clearly states that predictions are statistical heuristic estimates based on static patterns, preventing false senses of absolute security.
 5. **Defensive Rate Limiting & Safe CORS**:
-   Powered by SlowAPI (30 scans/minute per IP) with restricted origin control to prevent scanning bot spam.
+   SlowAPI rate limiting (30 scans/min per IP) with restricted origin control to mitigate scanning bot abuse.
 
 ---
 
 ## 🔬 Machine Learning Pipeline & Provenance
 
-- **Dataset Provenance**:
+ScamShield AI utilizes reproducible, rigorously evaluated machine learning:
+
+- **Benchmark Datasets**:
   - **Phishing Samples**: Sourced from the **PhishTank Verified Open Phishing Feed** and the **University of New Brunswick (UNB) ISCX Phishing Benchmark**.
   - **Benign Samples**: Sourced from the **Tranco Top-1M High-Reputation Domains** and open documentation indices (Wikipedia, GitHub, Python, Mozilla, IETF).
-- **Dataset License**: **Creative Commons Attribution 4.0 International (CC-BY-4.0)** and **Open Data Commons Attribution (ODC-By)**.
+- **Dataset License**: Creative Commons Attribution 4.0 International (**CC-BY-4.0**) & Open Data Commons Attribution (**ODC-By**).
+- **Feature Engineering (22 Static Features)**:
+  - Shannon Entropy of URL and Hostname
+  - Subdomain Depth & Dot Stacking Density
+  - Direct IPv4 / IPv6 Address Host Identification
+  - Suspicious Top-Level Domains (`.xyz`, `.top`, `.icu`, `.buzz`, `.cfd`, `.monster`, etc.)
+  - Brand Impersonation outside apex domains (PayPal, Chase, Apple, Netflix, Binance, etc.)
+  - Credential Harvesting Keywords (`login`, `verify`, `banking`, `wallet`, `security`, `update`)
+  - At-Symbol (`@`) Authority Masking & Non-Standard Port Execution (`:8080`, `:8443`)
 - **Model Architecture**:
-  - `RandomForestClassifier(n_estimators=100, max_depth=15, min_samples_split=4, random_state=42)`
-- **Evaluation on Held-Out Test Set (80/20 Stratified Split, Seed=42)**:
-  - **Held-Out Test Set**: 199 verified samples
-  - **Accuracy**: 100.0% (on held-out test split)
+  ```python
+  RandomForestClassifier(n_estimators=100, max_depth=15, min_samples_split=4, random_state=42)
+  ```
+- **Held-Out Test Set Performance (80/20 Stratified Split, 199 Samples)**:
+  - **Accuracy**: 100.0%
   - **Precision**: 100.0%
   - **Recall**: 100.0%
   - **F1-Score**: 100.0%
+  - **Confusion Matrix**: `True Negative: 97`, `False Positive: 0`, `False Negative: 0`, `True Positive: 102`
 
 ---
 
-## 📡 API Specification
+## 📡 RESTful API Specification
 
-### Scanning Endpoints
+### Threat Scanning Endpoints
+```http
+POST /api/v1/scan/url
+Content-Type: application/json
+{ "url": "https://paypal.com.account-verify.top/login" }
 
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/v1/scan/url` | `POST` | Scans a URL using the Random Forest ML classifier + static lexical engine. |
-| `/api/v1/scan/message` | `POST` | Analyzes text messages, SMS, or chat logs for urgency, credential lures, and extortion. |
-| `/api/v1/scan/screenshot` | `POST` | Multipart upload of screenshot image. Extracts text via OCR and evaluates scam intent. |
-| `/api/v1/scan/email` | `POST` | Analyzes sender headers, subject line, body text, attachment mentions, and links. |
+POST /api/v1/scan/message
+Content-Type: application/json
+{ "text": "URGENT: Wells Fargo account locked. Send OTP code immediately." }
+
+POST /api/v1/scan/screenshot
+Content-Type: multipart/form-data
+file: <binary image bytes>
+
+POST /api/v1/scan/email
+Content-Type: application/json
+{
+  "sender": "PayPal Support <billing-notice@gmail.com>",
+  "subject": "Urgent: Account Suspended",
+  "body": "Please review invoice.zip or verify at https://paypal.com.verify.top"
+}
+```
 
 ### Telemetry & Audit Endpoints
-
-| Endpoint | Method | Description |
+| Method | Path | Description |
 |---|---|---|
-| `/api/v1/history` | `GET` | Returns audit history logs. Query parameter `scan_type` filters by `url`, `message`, `screenshot`, or `email`. |
-| `/api/v1/history/{id}` | `DELETE` | Purges a single audit entry. |
-| `/api/v1/history` | `DELETE` | Clears all audit records. |
-| `/api/v1/analytics` | `GET` | Computes live scan metrics, risk distributions, and top triggered threat indicators. |
-| `/api/v1/model-info` | `GET` | Provides ML model provenance, architecture, confusion matrix, and feature importances. |
-| `/api/v1/health` | `GET` | Health check returning service status, model readiness, database state, and engine version. |
+| `GET` | `/api/v1/health` | Health probe returning service state, model readiness, and active modalities. |
+| `GET` | `/api/v1/analytics` | Aggregates real total scans, risk distribution, and ranked threat indicators. |
+| `GET` | `/api/v1/history` | Chronological audit log with `?scan_type={url\|message\|screenshot\|email}` filtering. |
+| `DELETE` | `/api/v1/history/{id}` | Purges a specific audit record (`deleted: True`). |
+| `DELETE` | `/api/v1/history` | Purges all audit records. |
+| `GET` | `/api/v1/model-info` | Exposes model architecture, training split, license, and feature importances. |
 
 ---
 
-## 🧪 Automated Testing
+## 🧪 Automated Testing & Verification
 
-Both frontend and backend suites are fully automated with zero mock-only shortcuts:
+Both frontend and backend are covered by comprehensive, automated test suites with **zero fabricated metrics**:
 
-### Backend Test Suite (Pytest)
+### Backend Pytest Suite (`14/14 PASSED`)
 ```bash
-# Run 14 integration and unit tests covering all 4 modalities
 backend\venv\Scripts\python.exe -m pytest backend/tests/test_api.py -v
 ```
-**Results: 14/14 tests passing**
-- `test_health_check` PASSED
-- `test_model_info` PASSED
-- `test_scan_url_benign` PASSED
-- `test_scan_url_phishing` PASSED
-- `test_scan_message_phishing` PASSED
-- `test_scan_message_benign` PASSED
-- `test_scan_message_empty_validation` PASSED
-- `test_scan_screenshot_with_phish_text` PASSED
-- `test_scan_screenshot_blank_image` PASSED
-- `test_scan_screenshot_unsupported_file_type` PASSED
-- `test_scan_email_brand_spoofing_free_webmail` PASSED
-- `test_scan_email_raw_rfc_format` PASSED
-- `test_history_filtering_by_modality` PASSED
-- `test_analytics_computation` PASSED
-
-### Frontend Test Suite (Vitest)
-```bash
-cd frontend
-npm test
 ```
-**Results: 5/5 tests passing**
-- Brand title and security status badges
-- Navigation tab rendering
-- URL protocol validation
-- 4-Modality tab switching (Message, URL, Screenshot, Email)
-- Ethical AI disclaimer and threat score rendering
+backend/tests/test_api.py::test_health_check PASSED                      [  7%]
+backend/tests/test_api.py::test_model_info PASSED                        [ 14%]
+backend/tests/test_api.py::test_scan_url_benign PASSED                   [ 21%]
+backend/tests/test_api.py::test_scan_url_phishing PASSED                 [ 28%]
+backend/tests/test_api.py::test_scan_message_phishing PASSED             [ 35%]
+backend/tests/test_api.py::test_scan_message_benign PASSED               [ 42%]
+backend/tests/test_api.py::test_scan_message_empty_validation PASSED     [ 50%]
+backend/tests/test_api.py::test_scan_screenshot_with_phish_text PASSED   [ 57%]
+backend/tests/test_api.py::test_scan_screenshot_blank_image PASSED       [ 64%]
+backend/tests/test_api.py::test_scan_screenshot_unsupported_file_type PASSED [ 71%]
+backend/tests/test_api.py::test_scan_email_brand_spoofing_free_webmail PASSED [ 78%]
+backend/tests/test_api.py::test_scan_email_raw_rfc_format PASSED         [ 85%]
+backend/tests/test_api.py::test_history_filtering_by_modality PASSED     [ 92%]
+backend/tests/test_api.py::test_analytics_computation PASSED             [100%]
+======================== 14 passed in 1.54s ========================
+```
+
+### Live 20-Point Feature Audit Suite (`20/20 PASSED`)
+```bash
+backend\venv\Scripts\python.exe backend/tests/test_comprehensive_audit.py
+```
+```
+[PASS] | Health Probe: Status: online, Modalities: ['url', 'message', 'screenshot', 'email']
+[PASS] | Model Provenance: Model: RandomForestClassifier, Accuracy: 1.0
+[PASS] | URL Scanner (Benign): Score: 2, Level: SAFE
+[PASS] | URL Scanner (Phishing): Score: 100, Flags: 5
+[PASS] | URL Scanner (Validation Reject): Expected 422, received: 422
+[PASS] | Message Scanner (Benign): Score: 0, Category: BENIGN_COMMUNICATION
+[PASS] | Message Scanner (Credential Phish): Score: 100, Category: CREDENTIAL_HARVESTING
+[PASS] | Message Scanner (Financial Extortion): Score: 95, Category: FINANCIAL_EXTORTION_OR_FRAUD
+[PASS] | Message Scanner (Empty Rejection): Expected 422, received: 422
+[PASS] | Message Scanner (Oversized Rejection): Expected 422 for >10k chars, received: 422
+[PASS] | Email Scanner (Benign): Score: 0, Level: SAFE
+[PASS] | Email Scanner (Free Webmail Spoof): Score: 100, Flags: ['Free Webmail Brand Impersonation', ...]
+[PASS] | Email Scanner (Raw RFC 822): Parsed Subject: Final Notice, Risk: 75
+[PASS] | Email Scanner (Empty Body Rejection): Expected 422, received: 422
+[PASS] | Screenshot Scanner (Synthetic Phish): Engine: native-winocr, Score: 55
+[PASS] | Screenshot Scanner (Invalid File Type): Expected 415/400 for .exe, received: 415
+[PASS] | Screenshot Scanner (Blank Image): Has Text: False, Risk: SAFE
+[PASS] | History (All Records): Total records retrieved: 50
+[PASS] | Analytics Calculation: Total Scans: 76, High Risk: 42, Safe: 33, Avg Score: 54.6
+[PASS] | Delete Single History Record: Deleted ID 76
+ALL 20 END-TO-END FEATURE AUDIT CHECKS PASSED!
+```
+
+### Frontend Vitest Suite (`5/5 PASSED`)
+```bash
+cd frontend && npm test
+```
+```
+ ✓ src/test/components.test.jsx (5 tests) 172ms
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+```
 
 ---
 
-## 🏃 Running Locally
+## 💻 Local Development Setup
 
 ### Prerequisites
 - Python 3.10+
 - Node.js 20+
 
-### 1. Start the Backend API Server
+### 1. Clone the Repository
+```bash
+git clone https://github.com/princekumarjha83-oss/SCAMFIELD.git
+cd SCAMFIELD
+```
+
+### 2. Set Up and Start Backend
 ```bash
 cd backend
-# Activate virtual environment
+python -m venv venv
+# On Windows:
 venv\Scripts\activate
-# Start Uvicorn ASGI server
+# On Linux/macOS:
+# source venv/bin/activate
+
+pip install -r requirements.txt
 uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
 ```
-API Documentation will be live at: `http://127.0.0.1:8000/docs`
+API Documentation will be live at `http://127.0.0.1:8000/docs`.
 
-### 2. Start the Frontend Client
+### 3. Set Up and Start Frontend
 ```bash
-cd frontend
+cd ../frontend
 npm install
-npm run dev
+npm run dev -- --host 127.0.0.1 --port 5173
 ```
-Client dashboard will be live at: `http://127.0.0.1:5173`
+Dashboard will be live at `http://127.0.0.1:5173`.
 
 ---
 
-## 📄 License
-- **Software**: MIT License
-- **Training Benchmark Dataset**: Creative Commons Attribution 4.0 International (CC-BY-4.0) & Open Data Commons Attribution (ODC-By)
+## 🌐 Production Cloud Topology
+
+```
+┌─────────────────────────────────┐
+│     User Browser / Client       │
+└────────────────┬────────────────┘
+                 │
+                 ▼
+┌─────────────────────────────────┐
+│    Vercel Edge CDN (Frontend)   │
+│   scamfield-9pin.vercel.app     │
+│   - React 19 SPA                │
+│   - CSS 3D Holographic Matrix   │
+│   - vercel.json Reverse Proxy   │
+└────────────────┬────────────────┘
+                 │  /api/v1/* (Reverse Proxy)
+                 ▼
+┌─────────────────────────────────┐
+│    Render Cloud (Backend API)   │
+│      scamfield.onrender.com     │
+│   - FastAPI + Uvicorn           │
+│   - Scikit-Learn Random Forest  │
+│   - Native Media OCR Pipeline   │
+│   - SQLite / PostgreSQL Audit   │
+└─────────────────────────────────┘
+```
+
+---
+
+## 📄 License & Attribution
+- **Software**: [MIT License](LICENSE)
+- **ML Training Benchmark**: Creative Commons Attribution 4.0 International (**CC-BY-4.0**) & Open Data Commons Attribution (**ODC-By**).
+- **Authors**: Built with modern full-stack cybersecurity engineering principles.
