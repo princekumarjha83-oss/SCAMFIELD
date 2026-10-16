@@ -15,7 +15,7 @@ describe('Header Component', () => {
     );
     expect(screen.getByText(/ScamShield/i)).toBeInTheDocument();
     expect(screen.getByText(/ZERO SSRF/i)).toBeInTheDocument();
-    expect(screen.getByText(/Engine v1.0 Ready/i)).toBeInTheDocument();
+    expect(screen.getByText(/Engine v2.0 Ready/i)).toBeInTheDocument();
   });
 
   it('renders all 5 main navigation tabs', () => {
@@ -26,7 +26,7 @@ describe('Header Component', () => {
         systemStatus={{ model_loaded: true }} 
       />
     );
-    expect(screen.getByRole('tab', { name: /Live Scanner/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Threat Workspace/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /Threat Analytics/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /Scan History/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /Model Provenance/i })).toBeInTheDocument();
@@ -35,7 +35,7 @@ describe('Header Component', () => {
 });
 
 describe('ScannerTab Component', () => {
-  it('validates protocol format before submitting', async () => {
+  it('validates protocol format before submitting URL', async () => {
     render(<ScannerTab />);
     const input = screen.getByPlaceholderText(/Enter complete target URL/i);
     const submitBtn = screen.getByRole('button', { name: /Analyze URL/i });
@@ -46,6 +46,28 @@ describe('ScannerTab Component', () => {
     expect(
       await screen.findByText(/Please specify a protocol \(http:\/\/ or https:\/\/\)/i)
     ).toBeInTheDocument();
+  });
+
+  it('switches between scanning modalities (URL, Message, Screenshot, Email)', () => {
+    render(<ScannerTab />);
+    
+    // Check mode buttons
+    const msgBtn = screen.getByRole('tab', { name: /Message Scanner/i });
+    const screenshotBtn = screen.getByRole('tab', { name: /Screenshot Scanner/i });
+    const emailBtn = screen.getByRole('tab', { name: /Email Scanner/i });
+
+    // Switch to Message Scanner
+    fireEvent.click(msgBtn);
+    expect(screen.getByPlaceholderText(/Paste suspicious text message, SMS/i)).toBeInTheDocument();
+
+    // Switch to Screenshot Scanner
+    fireEvent.click(screenshotBtn);
+    expect(screen.getByText(/Drop your screenshot here, or browse/i)).toBeInTheDocument();
+
+    // Switch to Email Scanner
+    fireEvent.click(emailBtn);
+    expect(screen.getByPlaceholderText(/PayPal Alerts <service@domain\.com>/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Urgent Action Required: Account Locked/i)).toBeInTheDocument();
   });
 
   it('displays ethical AI disclaimer and threat score when result is provided', () => {
@@ -80,6 +102,8 @@ describe('ScannerTab Component', () => {
     expect(screen.getAllByText(/92/)[0]).toBeInTheDocument();
     expect(screen.getByText(/HIGH RISK \/ MALICIOUS PHISHING/i)).toBeInTheDocument();
     expect(screen.getByText(/Uses high-abuse \.top/i)).toBeInTheDocument();
-    expect(screen.getByText(/Ethical AI & Defensive Safety Notice/i)).toBeInTheDocument();
+    expect(screen.getByText(/Defensive AI Scope & Non-Guarantee Notice/i)).toBeInTheDocument();
   });
 });
+
+

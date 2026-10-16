@@ -1,6 +1,6 @@
 /**
- * ScamShield AI - REST API Client
- * Connects to the FastAPI backend with safe error handling and timeout fallbacks.
+ * ScamShield AI - Multi-Modal API Client
+ * Provides safe HTTP communication for Message, URL, Screenshot, and Email threat analysis.
  */
 
 const API_BASE = import.meta.env.VITE_API_BASE || '/api/v1';
@@ -32,22 +32,66 @@ async function fetchJson(endpoint, options = {}) {
 }
 
 export const api = {
-  // Check backend health & model readiness
+  // Check backend health & readiness
   async checkHealth() {
     return fetchJson('/health');
   },
 
-  // Perform static lexical ML and heuristic scan of a URL
+  // 1. Static URL Scan
   async scanUrl(url) {
-    return fetchJson('/scan', {
+    return fetchJson('/scan/url', {
       method: 'POST',
       body: JSON.stringify({ url }),
     });
   },
 
-  // Retrieve persistent scan history
-  async getHistory(limit = 50, offset = 0) {
-    return fetchJson(`/history?limit=${limit}&offset=${offset}`);
+  // 2. Message / SMS / Chat Scan
+  async scanMessage(text) {
+    return fetchJson('/scan/message', {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    });
+  },
+
+  // 3. Screenshot OCR Scan
+  async scanScreenshot(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const url = `${API_BASE}/scan/screenshot`;
+    const response = await fetch(url, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      let errorDetail = 'Screenshot scan failed';
+      try {
+        const errData = await response.json();
+        errorDetail = errData.detail || errData.message || errorDetail;
+      } catch {
+        errorDetail = `Server returned status ${response.status} (${response.statusText})`;
+      }
+      const error = new Error(errorDetail);
+      error.status = response.status;
+      throw error;
+    }
+
+    return response.json();
+  },
+
+  // 4. Email Phishing Scan
+  async scanEmail({ body, subject, sender }) {
+    return fetchJson('/scan/email', {
+      method: 'POST',
+      body: JSON.stringify({ body, subject, sender }),
+    });
+  },
+
+  // Retrieve persistent scan history with modality filtering
+  async getHistory(scanType = 'all', limit = 50, offset = 0) {
+    const typeParam = scanType && scanType !== 'all' ? `&scan_type=${encodeURIComponent(scanType)}` : '';
+    return fetchJson(`/history?limit=${limit}&offset=${offset}${typeParam}`);
   },
 
   // Delete a history record
@@ -69,7 +113,7 @@ export const api = {
     return fetchJson('/analytics');
   },
 
-  // Retrieve ML model provenance and held-out test evaluation metrics
+  // Retrieve ML model provenance and evaluation metrics
   async getModelInfo() {
     return fetchJson('/model-info');
   },

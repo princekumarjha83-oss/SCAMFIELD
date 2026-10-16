@@ -1,61 +1,53 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Header from './components/Header';
+import CyberShield3D from './components/CyberShield3D';
 import ScannerTab from './components/ScannerTab';
 import AnalyticsTab from './components/AnalyticsTab';
 import HistoryTab from './components/HistoryTab';
 import ModelMetricsTab from './components/ModelMetricsTab';
 import EducationTab from './components/EducationTab';
-import { Shield, ShieldAlert, Cpu, Heart, CheckCircle2 } from 'lucide-react';
+import { api } from './services/api';
 import './App.css';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('scanner');
+  const [activeModality, setActiveModality] = useState('url');
   const [systemStatus, setSystemStatus] = useState({
     status: 'connecting',
     model_loaded: false,
     message: 'Initializing engine...',
   });
   const [lastScanResult, setLastScanResult] = useState(null);
+  const scannerRef = useRef(null);
 
-  // Poll health on mount
   useEffect(() => {
     let isMounted = true;
 
     const checkSystemHealth = async () => {
       try {
-        const response = await fetch('/api/v1/health');
-        if (response.ok) {
-          const data = await response.json();
-          if (isMounted) {
-            setSystemStatus({
-              status: 'online',
-              model_loaded: Boolean(data.model_loaded),
-              message: data.model_loaded ? 'Engine v1.0 Ready' : 'Heuristic Mode Only',
-              version: data.version,
-            });
-          }
-        } else {
-          if (isMounted) {
-            setSystemStatus({
-              status: 'offline',
-              model_loaded: false,
-              message: 'Backend Service Unavailable',
-            });
-          }
+        const data = await api.checkHealth();
+        if (isMounted) {
+          setSystemStatus({
+            status: 'online',
+            model_loaded: Boolean(data.model_loaded),
+            message: data.model_loaded ? 'Engine v2.0 Ready' : 'Heuristic Mode Active',
+            version: data.version,
+            modalities: data.supported_modalities || ['url', 'message', 'screenshot', 'email']
+          });
         }
       } catch (err) {
         if (isMounted) {
           setSystemStatus({
             status: 'offline',
             model_loaded: false,
-            message: 'Engine Offline',
+            message: 'Backend Offline',
           });
         }
       }
     };
 
     checkSystemHealth();
-    const interval = setInterval(checkSystemHealth, 20000);
+    const interval = setInterval(checkSystemHealth, 25000);
     return () => {
       isMounted = false;
       clearInterval(interval);
@@ -66,19 +58,50 @@ export default function App() {
     setLastScanResult(result);
   };
 
+  const handleHeroScanClick = () => {
+    setActiveTab('scanner');
+    if (scannerRef.current) {
+      scannerRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   const handleSelectHistoryItem = (item) => {
-    // Transform history item into result format if needed and open in scanner
+    const modality = item.scan_type || 'url';
+    setActiveModality(modality);
+    setActiveTab('scanner');
+
+    let parsedIndicators = [];
+    try {
+      parsedIndicators = Array.isArray(item.indicators) ? item.indicators : JSON.parse(item.indicators || '[]');
+    } catch {
+      parsedIndicators = [];
+    }
+
+    let parsedFeatures = {};
+    try {
+      parsedFeatures = typeof item.features === 'object' ? item.features : JSON.parse(item.features || '{}');
+    } catch {
+      parsedFeatures = {};
+    }
+
     setLastScanResult({
+      scan_type: modality,
       url: item.url,
       risk_score: item.risk_score,
       risk_level: item.risk_level,
       ml_confidence: item.ml_confidence,
       phishing_probability: item.phishing_probability ?? (item.risk_score / 100),
-      indicators: Array.isArray(item.indicators) ? item.indicators : JSON.parse(item.indicators || '[]'),
-      features: typeof item.features === 'object' ? item.features : JSON.parse(item.features || '{}'),
+      summary: item.summary,
+      indicators: parsedIndicators,
+      features: parsedFeatures,
+      extracted_urls: [],
+      recommended_actions: [],
       scanned_at: item.scanned_at || item.created_at,
     });
-    setActiveTab('scanner');
+
+    if (scannerRef.current) {
+      scannerRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
   return (
@@ -90,12 +113,18 @@ export default function App() {
         systemStatus={systemStatus} 
       />
 
+      {/* Hero 3D Section displayed at the top of the dashboard */}
+      {activeTab === 'scanner' && (
+        <CyberShield3D onScanClick={handleHeroScanClick} />
+      )}
+
       {/* Main Content Area */}
-      <main className="main-content" id="main-content">
+      <main className="main-content" id="main-content" ref={scannerRef}>
         {activeTab === 'scanner' && (
           <ScannerTab 
             onScanComplete={handleScanComplete} 
             lastResult={lastScanResult} 
+            initialModality={activeModality}
           />
         )}
         {activeTab === 'analytics' && <AnalyticsTab />}
@@ -112,17 +141,17 @@ export default function App() {
           <div className="footer-left">
             <span className="footer-brand">ScamShield AI Platform</span>
             <span className="footer-sep">•</span>
-            <span className="footer-sub">Defense-in-depth offline phishing & scam intelligence</span>
+            <span className="footer-sub">Defense-in-depth offline phishing &amp; scam intelligence</span>
           </div>
 
           <div className="footer-center">
             <span className="footer-disclaimer-pill">
-              Statistical Heuristic Estimates • Zero Remote Connection Policy
+              Message • URL • Screenshot • Email — Statistical Heuristic Risk Estimates
             </span>
           </div>
 
           <div className="footer-right">
-            <span>FastAPI + Scikit-Learn + React</span>
+            <span>FastAPI + Scikit-Learn + React 19</span>
           </div>
         </div>
       </footer>

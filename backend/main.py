@@ -1,7 +1,10 @@
 """
-ScamShield AI - Enterprise FastAPI Threat Intelligence Engine
-Provides static URL scanning, Scikit-learn ML inference, security heuristics,
-persistent audit logs, rate limiting, and analytics.
+ScamShield AI - Enterprise Multi-Modal Threat Intelligence Gateway
+Supports real-time inspection for:
+1. URL Scanner (Scikit-Learn Random Forest + Heuristics)
+2. Message Scanner (Urgency, Impersonation, Credential/Payment Demands)
+3. Screenshot Scanner (Native Windows OCR + Multi-Factor Text Inspection)
+4. Email Scanner (Sender Spoofing, Subject Coercion, Link Verification, Attachments)
 """
 
 import os
@@ -16,7 +19,7 @@ from contextlib import asynccontextmanager
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import joblib
-from fastapi import FastAPI, Depends, HTTPException, Request, status
+from fastapi import FastAPI, Depends, HTTPException, Request, UploadFile, File, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
@@ -29,19 +32,21 @@ from backend.config import settings
 from backend.database import get_db, init_db, engine
 from backend.models import ScanRecord
 from backend.schemas import (
-    ScanRequest, ScanResponse, HistoryItemResponse,
-    AnalyticsResponse, ModelInfoResponse, HealthResponse, IndicatorItem
+    ScanRequest, ScanResponse, MessageScanRequest, MessageScanResponse,
+    EmailScanRequest, EmailScanResponse, ScreenshotScanResponse,
+    HistoryItemResponse, AnalyticsResponse, ModelInfoResponse, HealthResponse, IndicatorItem
 )
 from backend.sanitizer import sanitize_and_log_scan, hash_url
 from backend.heuristics import evaluate_heuristics, compute_composite_risk
+from backend.nlp_analyzer import analyze_message_content
+from backend.email_analyzer import analyze_email_content
+from backend.ocr_engine import extract_text_from_image_bytes
 from ml.features import extract_features, features_to_vector
 
 logger = logging.getLogger("scamshield.api")
 
-# Rate Limiter setup
 limiter = Limiter(key_func=get_remote_address, default_limits=[settings.RATE_LIMIT_PER_MINUTE])
 
-# Global ML Model state
 ml_state = {
     "model": None,
     "metrics": None,
@@ -50,7 +55,6 @@ ml_state = {
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Initialize DB and load ML artifacts
     init_db()
     try:
         if os.path.exists(settings.MODEL_PATH):
@@ -68,20 +72,17 @@ async def lifespan(app: FastAPI):
         logger.error(f"[!] Error loading ML artifacts: {e}")
 
     yield
-    # Shutdown clean up if needed
 
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.VERSION,
-    description="Enterprise defense-in-depth phishing detection and URL security intelligence API.",
+    description="Enterprise defense-in-depth phishing detection and multi-modal scam intelligence API.",
     lifespan=lifespan
 )
 
-# Attach rate limiter to app state
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# CORS Middleware restricted to configured origins
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -90,7 +91,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Safe global exception handler
 @app.exception_handler(Exception)
 async def safe_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled exception during request {request.url.path}: {exc}", exc_info=settings.DEBUG)
@@ -101,11 +101,11 @@ async def safe_exception_handler(request: Request, exc: Exception):
 
 DISCLAIMER_TEXT = (
     "ScamShield AI predictions and risk scores are statistical heuristic estimates computed strictly "
-    "via offline static inspection of URL text patterns. They do not constitute an absolute safety guarantee, "
+    "via offline static inspection. They do not constitute an absolute safety guarantee, "
     "legal warranty, or real-time threat intelligence feed. ScamShield never visits or executes target links."
 )
 
-# ----------------- API ROUTES -----------------
+# ----------------- SYSTEM ROUTES -----------------
 
 @app.get("/api/v1/health", response_model=HealthResponse)
 def health_check(db: Session = Depends(get_db)):
@@ -122,29 +122,28 @@ def health_check(db: Session = Depends(get_db)):
         version=settings.VERSION,
         model_loaded=ml_state["model_loaded"],
         db_connected=db_connected,
-        environment=settings.ENVIRONMENT
+        environment=settings.ENVIRONMENT,
+        supported_modalities=["url", "message", "screenshot", "email"]
     )
 
+# ----------------- MODALITY 1: URL SCANNER -----------------
+
 @app.post("/api/v1/scan", response_model=ScanResponse)
+@app.post("/api/v1/scan/url", response_model=ScanResponse)
 @limiter.limit(settings.SCAN_RATE_LIMIT_PER_MINUTE)
 def scan_url(request: Request, payload: ScanRequest, db: Session = Depends(get_db)):
-    """
-    Executes purely offline static lexical and heuristic URL security inspection.
-    NEVER makes outbound HTTP requests to the inspected URL.
-    """
+    """Executes offline static lexical and ML URL threat inspection."""
     url = payload.url.strip()
 
-    # 1. Static feature extraction
     try:
         features = extract_features(url)
         vector = features_to_vector(features)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Failed to parse URL lexical structure: {str(e)}"
+            detail=f"Failed to parse URL structure: {str(e)}"
         )
 
-    # 2. Scikit-learn ML Inference
     if ml_state["model_loaded"] and ml_state["model"]:
         try:
             proba = ml_state["model"].predict_proba([vector])[0]
@@ -155,40 +154,32 @@ def scan_url(request: Request, payload: ScanRequest, db: Session = Depends(get_d
             phishing_proba = 0.5
             ml_confidence = 0.5
     else:
-        # Fallback if model not yet trained
         phishing_proba = 0.5
         ml_confidence = 0.5
 
-    # 3. Deterministic Heuristics & Explainability
     indicators, heuristic_score = evaluate_heuristics(url, features)
-
-    # 4. Composite Risk Aggregation
     risk_score, risk_level = compute_composite_risk(phishing_proba, heuristic_score)
 
-    # 5. Clean meta keys for response
     clean_features = {k: v for k, v in features.items() if not k.startswith('_')}
     meta = features.get('_meta', {})
     clean_features['domain'] = meta.get('host', '')
     clean_features['protocol'] = meta.get('protocol', '')
     clean_features['tld'] = meta.get('tld', '')
 
-    # 6. Privacy-preserving audit logging
     url_digest = sanitize_and_log_scan(url, risk_score, risk_level)
-
-    # 7. Persistent database storage
     now = datetime.utcnow()
-    indicators_json = json.dumps([ind.model_dump() for ind in indicators])
-    features_json = json.dumps(clean_features)
 
     record = ScanRecord(
+        scan_type="url",
         url=url,
         url_hash=url_digest,
         risk_score=risk_score,
         risk_level=risk_level,
         ml_confidence=ml_confidence,
         phishing_probability=phishing_proba,
-        indicators=indicators_json,
-        features=features_json,
+        summary=f"URL evaluated as {risk_level} risk ({risk_score}/100) with {len(indicators)} heuristic flags.",
+        indicators=json.dumps([ind.model_dump() for ind in indicators]),
+        features=json.dumps(clean_features),
         scanned_at=now
     )
     db.add(record)
@@ -206,17 +197,207 @@ def scan_url(request: Request, payload: ScanRequest, db: Session = Depends(get_d
         disclaimer=DISCLAIMER_TEXT
     )
 
-@app.get("/api/v1/history", response_model=List[HistoryItemResponse])
-def get_scan_history(limit: int = 50, offset: int = 0, db: Session = Depends(get_db)):
-    """Retrieves chronological scan audit history."""
-    limit = max(1, min(100, limit))
-    records = (
-        db.query(ScanRecord)
-        .order_by(ScanRecord.scanned_at.desc())
-        .offset(offset)
-        .limit(limit)
-        .all()
+# ----------------- MODALITY 2: MESSAGE SCANNER -----------------
+
+@app.post("/api/v1/scan/message", response_model=MessageScanResponse)
+@limiter.limit(settings.SCAN_RATE_LIMIT_PER_MINUTE)
+def scan_message(request: Request, payload: MessageScanRequest, db: Session = Depends(get_db)):
+    """Analyzes text, SMS, or chat communications for coercion, impersonation, and fraud lures."""
+    text = payload.text.strip()
+    result = analyze_message_content(text)
+
+    now = datetime.utcnow()
+    text_digest = hash_url(text)
+
+    # Truncated title for history
+    preview = (text[:90] + "...") if len(text) > 90 else text
+
+    record = ScanRecord(
+        scan_type="message",
+        url=preview,
+        url_hash=text_digest,
+        risk_score=result["risk_score"],
+        risk_level=result["risk_level"],
+        summary=result["summary"],
+        indicators=json.dumps([ind.model_dump() for ind in result["indicators"]]),
+        features=json.dumps({
+            "intent_category": result["intent_category"],
+            "extracted_urls_count": len(result["extracted_urls"]),
+            "char_count": len(text)
+        }),
+        scanned_at=now
     )
+    db.add(record)
+    db.commit()
+
+    return MessageScanResponse(
+        scan_type="message",
+        risk_score=result["risk_score"],
+        risk_level=result["risk_level"],
+        intent_category=result["intent_category"],
+        indicators=result["indicators"],
+        extracted_urls=result["extracted_urls"],
+        summary=result["summary"],
+        recommended_actions=result["recommended_actions"],
+        scanned_at=now,
+        disclaimer=DISCLAIMER_TEXT
+    )
+
+# ----------------- MODALITY 3: SCREENSHOT SCANNER -----------------
+
+@app.post("/api/v1/scan/screenshot", response_model=ScreenshotScanResponse)
+@limiter.limit(settings.SCAN_RATE_LIMIT_PER_MINUTE)
+async def scan_screenshot(
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """Performs native OCR on uploaded screenshot and executes full scam analysis on extracted text."""
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail=f"Unsupported file type '{file.content_type}'. Please upload a PNG, JPEG, WEBP, or BMP image."
+        )
+
+    try:
+        image_bytes = await file.read()
+        extracted_text, ocr_metadata = extract_text_from_image_bytes(image_bytes, file.filename or "screenshot.png")
+    except ValueError as ve:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"OCR execution failed: {str(e)}")
+
+    now = datetime.utcnow()
+    file_digest = hash_url(file.filename + str(len(image_bytes)))
+
+    if not extracted_text:
+        # Graceful no-text handling
+        record = ScanRecord(
+            scan_type="screenshot",
+            url=f"Screenshot: {file.filename} (No text detected)",
+            url_hash=file_digest,
+            risk_score=0,
+            risk_level="SAFE",
+            summary="No legible text extracted from image.",
+            indicators=json.dumps([]),
+            features=json.dumps(ocr_metadata),
+            scanned_at=now
+        )
+        db.add(record)
+        db.commit()
+
+        return ScreenshotScanResponse(
+            scan_type="screenshot",
+            risk_score=0,
+            risk_level="SAFE",
+            extracted_text="",
+            ocr_metadata=ocr_metadata,
+            intent_category="NO_EXTRACTED_TEXT",
+            indicators=[],
+            extracted_urls=[],
+            summary="No legible text found in uploaded image. Please ensure the screenshot is clear and contains text.",
+            recommended_actions=["Upload an image with clear, readable text or paste the message into the Message Scanner."],
+            scanned_at=now,
+            disclaimer=DISCLAIMER_TEXT
+        )
+
+    # Analyze extracted text
+    analysis = analyze_message_content(extracted_text)
+
+    record = ScanRecord(
+        scan_type="screenshot",
+        url=f"Screenshot: {file.filename} ({len(extracted_text)} chars)",
+        url_hash=file_digest,
+        risk_score=analysis["risk_score"],
+        risk_level=analysis["risk_level"],
+        summary=f"Screenshot text: {analysis['summary']}",
+        indicators=json.dumps([ind.model_dump() for ind in analysis["indicators"]]),
+        features=json.dumps(ocr_metadata),
+        scanned_at=now
+    )
+    db.add(record)
+    db.commit()
+
+    return ScreenshotScanResponse(
+        scan_type="screenshot",
+        risk_score=analysis["risk_score"],
+        risk_level=analysis["risk_level"],
+        extracted_text=extracted_text,
+        ocr_metadata=ocr_metadata,
+        intent_category=analysis["intent_category"],
+        indicators=analysis["indicators"],
+        extracted_urls=analysis["extracted_urls"],
+        summary=analysis["summary"],
+        recommended_actions=analysis["recommended_actions"],
+        scanned_at=now,
+        disclaimer=DISCLAIMER_TEXT
+    )
+
+# ----------------- MODALITY 4: EMAIL SCANNER -----------------
+
+@app.post("/api/v1/scan/email", response_model=EmailScanResponse)
+@limiter.limit(settings.SCAN_RATE_LIMIT_PER_MINUTE)
+def scan_email(request: Request, payload: EmailScanRequest, db: Session = Depends(get_db)):
+    """Inspects email content, sender consistency, subject line urgency, and dangerous attachments."""
+    analysis = analyze_email_content(
+        body=payload.body,
+        subject=payload.subject,
+        sender=payload.sender
+    )
+
+    now = datetime.utcnow()
+    email_digest = hash_url((payload.sender or "") + (payload.subject or "") + payload.body[:200])
+
+    preview = f"Email: {analysis['subject']} (From: {analysis['sender']})"[:120]
+
+    record = ScanRecord(
+        scan_type="email",
+        url=preview,
+        url_hash=email_digest,
+        risk_score=analysis["risk_score"],
+        risk_level=analysis["risk_level"],
+        summary=analysis["summary"],
+        indicators=json.dumps([ind.model_dump() for ind in analysis["indicators"]]),
+        features=json.dumps({
+            "sender": analysis["sender"],
+            "subject": analysis["subject"],
+            "extracted_urls_count": len(analysis["extracted_urls"])
+        }),
+        scanned_at=now
+    )
+    db.add(record)
+    db.commit()
+
+    return EmailScanResponse(
+        scan_type="email",
+        risk_score=analysis["risk_score"],
+        risk_level=analysis["risk_level"],
+        sender=analysis["sender"],
+        subject=analysis["subject"],
+        indicators=analysis["indicators"],
+        extracted_urls=analysis["extracted_urls"],
+        summary=analysis["summary"],
+        recommended_actions=analysis["recommended_actions"],
+        disclaimer=analysis["disclaimer"],
+        scanned_at=now
+    )
+
+# ----------------- AUDIT HISTORY & ANALYTICS -----------------
+
+@app.get("/api/v1/history", response_model=List[HistoryItemResponse])
+def get_scan_history(
+    scan_type: Optional[str] = None,
+    limit: int = 50, 
+    offset: int = 0, 
+    db: Session = Depends(get_db)
+):
+    """Retrieves chronological audit history with optional scan_type filter."""
+    limit = max(1, min(100, limit))
+    query = db.query(ScanRecord)
+    if scan_type and scan_type.lower() != "all":
+        query = query.filter(ScanRecord.scan_type == scan_type.lower())
+
+    records = query.order_by(ScanRecord.scanned_at.desc()).offset(offset).limit(limit).all()
 
     items = []
     for r in records:
@@ -231,11 +412,13 @@ def get_scan_history(limit: int = 50, offset: int = 0, db: Session = Depends(get
 
         items.append(HistoryItemResponse(
             id=r.id,
+            scan_type=r.scan_type or "url",
             url=r.url,
             risk_score=r.risk_score,
             risk_level=r.risk_level,
             ml_confidence=r.ml_confidence,
             phishing_probability=r.phishing_probability,
+            summary=r.summary,
             indicators=indicators_list,
             features=features_dict,
             scanned_at=r.scanned_at
@@ -250,18 +433,18 @@ def delete_history_item(record_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Scan record not found.")
     db.delete(record)
     db.commit()
-    return {"message": f"Record {record_id} successfully deleted."}
+    return {"deleted": True, "message": f"Record {record_id} successfully deleted."}
 
 @app.delete("/api/v1/history", status_code=status.HTTP_200_OK)
 def clear_all_history(db: Session = Depends(get_db)):
     """Purges all scan audit history records."""
-    db.query(ScanRecord).delete()
+    count = db.query(ScanRecord).delete()
     db.commit()
-    return {"message": "All history audit logs purged."}
+    return {"deleted": True, "count": count, "message": "All history audit logs purged."}
 
 @app.get("/api/v1/analytics", response_model=AnalyticsResponse)
 def get_analytics(db: Session = Depends(get_db)):
-    """Computes aggregate threat telemetry across historical URL scans."""
+    """Computes aggregate threat telemetry across historical scans."""
     total = db.query(ScanRecord).count()
     high_risk = db.query(ScanRecord).filter(ScanRecord.risk_level == "HIGH").count()
     suspicious = db.query(ScanRecord).filter(ScanRecord.risk_level == "SUSPICIOUS").count()
@@ -270,9 +453,8 @@ def get_analytics(db: Session = Depends(get_db)):
     avg_score_res = db.query(func.avg(ScanRecord.risk_score)).scalar()
     avg_score = float(avg_score_res) if avg_score_res is not None else 0.0
 
-    # Count top triggered indicator names
     indicator_counts = {}
-    records = db.query(ScanRecord.indicators).limit(200).all()
+    records = db.query(ScanRecord.indicators).limit(300).all()
     for (ind_str,) in records:
         try:
             inds = json.loads(ind_str)
@@ -284,7 +466,7 @@ def get_analytics(db: Session = Depends(get_db)):
 
     sorted_indicators = [
         {"name": k, "count": v}
-        for k, v in sorted(indicator_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+        for k, v in sorted(indicator_counts.items(), key=lambda x: x[1], reverse=True)[:6]
     ]
 
     db_type = "PostgreSQL" if "postgresql" in settings.DATABASE_URL else "SQLite (Local Persistence)"
@@ -303,7 +485,6 @@ def get_analytics(db: Session = Depends(get_db)):
 def get_model_info():
     """Returns verifiable ML model provenance, architecture, and held-out evaluation metrics."""
     if not ml_state["metrics"]:
-        # Fallback default provenance if file not loaded
         return ModelInfoResponse(
             model_name="RandomForestClassifier",
             architecture="RandomForestClassifier(n_estimators=100, max_depth=15, min_samples_split=4)",

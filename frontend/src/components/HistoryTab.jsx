@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { 
   History, Search, Trash2, Download, ExternalLink, 
-  ShieldAlert, ShieldCheck, AlertTriangle, Eye, RefreshCw 
+  ShieldAlert, ShieldCheck, AlertTriangle, Eye, RefreshCw,
+  Globe, MessageSquare, Camera, Mail
 } from 'lucide-react';
+import { api } from '../services/api';
 
 export default function HistoryTab({ onSelectHistoryItem }) {
   const [historyItems, setHistoryItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterType, setFilterType] = useState('ALL');
   const [filterRisk, setFilterRisk] = useState('ALL');
   const [selectedItem, setSelectedItem] = useState(null);
 
@@ -16,9 +19,7 @@ export default function HistoryTab({ onSelectHistoryItem }) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/v1/history');
-      if (!res.ok) throw new Error('Failed to retrieve history');
-      const data = await res.json();
+      const data = await api.getHistory(filterType.toLowerCase());
       setHistoryItems(Array.isArray(data) ? data : (data.items || []));
     } catch (err) {
       setError(err.message || 'Error loading scan history');
@@ -29,12 +30,11 @@ export default function HistoryTab({ onSelectHistoryItem }) {
 
   useEffect(() => {
     fetchHistory();
-  }, []);
+  }, [filterType]);
 
   const handleDelete = async (id) => {
     try {
-      const res = await fetch(`/api/v1/history/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Failed to delete history record');
+      await api.deleteHistoryItem(id);
       setHistoryItems(prev => prev.filter(item => item.id !== id));
       if (selectedItem?.id === id) setSelectedItem(null);
     } catch (err) {
@@ -43,10 +43,9 @@ export default function HistoryTab({ onSelectHistoryItem }) {
   };
 
   const handleClearAll = async () => {
-    if (!window.confirm('Are you sure you want to clear all scan history records?')) return;
+    if (!window.confirm('Are you sure you want to permanently clear all scan history audit records?')) return;
     try {
-      const res = await fetch('/api/v1/history', { method: 'DELETE' });
-      if (!res.ok) throw new Error('Failed to clear history');
+      await api.clearHistory();
       setHistoryItems([]);
       setSelectedItem(null);
     } catch (err) {
@@ -58,15 +57,16 @@ export default function HistoryTab({ onSelectHistoryItem }) {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(historyItems, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `scamshield_audit_history_${new Date().toISOString().slice(0, 10)}.json`);
+    downloadAnchor.setAttribute("download", `scamshield_audit_logs_${new Date().toISOString().slice(0, 10)}.json`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
   };
 
-  // Filter items
+  // Filter items in client for search query and risk rating
   const filteredItems = historyItems.filter(item => {
-    const matchesSearch = item.url.toLowerCase().includes(searchQuery.toLowerCase());
+    const text = (item.url || '') + ' ' + (item.summary || '');
+    const matchesSearch = text.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesRisk = filterRisk === 'ALL' || item.risk_level?.toUpperCase() === filterRisk.toUpperCase();
     return matchesSearch && matchesRisk;
   });
@@ -82,13 +82,24 @@ export default function HistoryTab({ onSelectHistoryItem }) {
     return <span className="badge-safe"><ShieldCheck size={12} /> Benign</span>;
   };
 
+  const getModalityIcon = (type) => {
+    switch ((type || '').toLowerCase()) {
+      case 'message': return <MessageSquare size={14} className="text-cyan" />;
+      case 'screenshot': return <Camera size={14} className="text-violet" />;
+      case 'email': return <Mail size={14} className="text-amber" />;
+      case 'url':
+      default:
+        return <Globe size={14} className="text-emerald" />;
+    }
+  };
+
   return (
     <div className="history-container animate-fade-in">
       <div className="history-header">
         <div>
-          <h2 className="tab-heading">Historical URL Inspection Logs</h2>
+          <h2 className="tab-heading">Chronological Threat Audit Logs</h2>
           <p className="tab-sub">
-            Audit trail of analyzed links with static risk ratings, timestamps, and detection indicators.
+            Review persistent inspection logs across URLs, messages, screenshots, and emails with full indicator telemetry.
           </p>
         </div>
 
@@ -140,23 +151,43 @@ export default function HistoryTab({ onSelectHistoryItem }) {
           <Search size={16} className="text-muted" />
           <input
             type="text"
-            placeholder="Search by URL or domain string..."
+            placeholder="Search by target string, summary, or domain..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="search-input"
           />
         </div>
 
-        <div className="risk-filter-chips">
-          {['ALL', 'HIGH', 'SUSPICIOUS', 'SAFE'].map((lvl) => (
-            <button
-              key={lvl}
-              onClick={() => setFilterRisk(lvl)}
-              className={`filter-chip ${filterRisk === lvl ? 'filter-chip-active' : ''}`}
-            >
-              {lvl}
-            </button>
-          ))}
+        {/* Scan Type Filter Chips */}
+        <div className="filter-group-wrap">
+          <span className="filter-group-label">Type:</span>
+          <div className="risk-filter-chips">
+            {['ALL', 'URL', 'MESSAGE', 'SCREENSHOT', 'EMAIL'].map((t) => (
+              <button
+                key={t}
+                onClick={() => setFilterType(t)}
+                className={`filter-chip ${filterType === t ? 'filter-chip-active' : ''}`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Risk Filter Chips */}
+        <div className="filter-group-wrap">
+          <span className="filter-group-label">Risk:</span>
+          <div className="risk-filter-chips">
+            {['ALL', 'HIGH', 'SUSPICIOUS', 'SAFE'].map((lvl) => (
+              <button
+                key={lvl}
+                onClick={() => setFilterRisk(lvl)}
+                className={`filter-chip ${filterRisk === lvl ? 'filter-chip-active' : ''}`}
+              >
+                {lvl}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -164,22 +195,23 @@ export default function HistoryTab({ onSelectHistoryItem }) {
       <div className="glass-panel history-table-card">
         {loading && historyItems.length === 0 ? (
           <div className="table-loading">
-            <RefreshCw size={24} className="animate-spin text-emerald" />
-            <p>Loading audit logs...</p>
+            <RefreshCw size={24} className="animate-spin text-cyan" />
+            <p>Loading multi-modal audit logs...</p>
           </div>
         ) : filteredItems.length === 0 ? (
           <div className="empty-history-notice">
             <History size={36} className="text-muted" />
             <p>No inspection logs found matching your criteria.</p>
-            <span className="empty-sub">Run a scan on the Live Scanner tab to generate new audit entries.</span>
+            <span className="empty-sub">Run a scan on the workspace tabs (Message, URL, Screenshot, Email) to generate audit entries.</span>
           </div>
         ) : (
           <div className="table-responsive">
             <table className="history-table">
               <thead>
                 <tr>
+                  <th>Type</th>
                   <th>Timestamp</th>
-                  <th>Scanned URL</th>
+                  <th>Target / Summary</th>
                   <th>Risk Score</th>
                   <th>Verdict</th>
                   <th>Indicators</th>
@@ -189,11 +221,18 @@ export default function HistoryTab({ onSelectHistoryItem }) {
               <tbody>
                 {filteredItems.map((item) => (
                   <tr key={item.id} className="history-row">
+                    <td className="type-cell">
+                      <div className="modality-tag" title={`Modality: ${item.scan_type || 'url'}`}>
+                        {getModalityIcon(item.scan_type)}
+                        <span className="modality-name">{(item.scan_type || 'url').toUpperCase()}</span>
+                      </div>
+                    </td>
                     <td className="timestamp-cell">
                       {new Date(item.scanned_at || item.created_at || Date.now()).toLocaleString()}
                     </td>
                     <td className="url-cell" title={item.url}>
                       <span className="mono url-text">{item.url}</span>
+                      {item.summary && <span className="history-summary-sub">{item.summary}</span>}
                     </td>
                     <td className="score-cell">
                       <span className={`score-badge ${
@@ -207,7 +246,7 @@ export default function HistoryTab({ onSelectHistoryItem }) {
                     </td>
                     <td className="indicators-cell">
                       <span className="indicator-count-pill">
-                        {item.indicators ? (Array.isArray(item.indicators) ? item.indicators.length : JSON.parse(item.indicators || '[]').length) : 0} triggers
+                        {item.indicators ? (Array.isArray(item.indicators) ? item.indicators.length : JSON.parse(item.indicators || '[]').length) : 0} flags
                       </span>
                     </td>
                     <td className="actions-cell">
@@ -242,19 +281,28 @@ export default function HistoryTab({ onSelectHistoryItem }) {
         )}
       </div>
 
-      {/* Detail Inspection Modal for selected item */}
+      {/* Modal */}
       {selectedItem && (
         <div className="modal-overlay" onClick={() => setSelectedItem(null)}>
           <div className="glass-panel modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3 className="modal-title">Inspection Audit Record #{selectedItem.id}</h3>
+              <h3 className="modal-title">
+                {getModalityIcon(selectedItem.scan_type)}
+                <span>Inspection Record #{selectedItem.id} ({(selectedItem.scan_type || 'url').toUpperCase()})</span>
+              </h3>
               <button onClick={() => setSelectedItem(null)} className="modal-close-btn">&times;</button>
             </div>
             <div className="modal-body">
               <div className="detail-item">
-                <span className="detail-label">Target URL:</span>
+                <span className="detail-label">Target / Input:</span>
                 <span className="mono detail-val-url">{selectedItem.url}</span>
               </div>
+              {selectedItem.summary && (
+                <div className="detail-item">
+                  <span className="detail-label">Summary:</span>
+                  <p className="detail-val-summary">{selectedItem.summary}</p>
+                </div>
+              )}
               <div className="detail-grid">
                 <div>
                   <span className="detail-label">Risk Score:</span>
@@ -269,13 +317,13 @@ export default function HistoryTab({ onSelectHistoryItem }) {
                   <span>{new Date(selectedItem.scanned_at || Date.now()).toLocaleString()}</span>
                 </div>
                 <div>
-                  <span className="detail-label">ML Confidence:</span>
-                  <span>{selectedItem.ml_confidence ? `${(selectedItem.ml_confidence * 100).toFixed(1)}%` : 'N/A'}</span>
+                  <span className="detail-label">Modality:</span>
+                  <span className="capitalize">{selectedItem.scan_type || 'url'}</span>
                 </div>
               </div>
 
               <div className="modal-indicators-section">
-                <h4 className="indicators-subheading">Triggered Heuristics:</h4>
+                <h4 className="indicators-subheading">Triggered Signals &amp; Flags:</h4>
                 {selectedItem.indicators && (Array.isArray(selectedItem.indicators) ? selectedItem.indicators : JSON.parse(selectedItem.indicators || '[]')).length > 0 ? (
                   <div className="modal-indicators-list">
                     {(Array.isArray(selectedItem.indicators) ? selectedItem.indicators : JSON.parse(selectedItem.indicators || '[]')).map((ind, i) => (
@@ -291,7 +339,7 @@ export default function HistoryTab({ onSelectHistoryItem }) {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-muted text-sm">No high-risk heuristics recorded for this entry.</p>
+                  <p className="text-muted text-sm">No high-risk indicators recorded for this entry.</p>
                 )}
               </div>
             </div>

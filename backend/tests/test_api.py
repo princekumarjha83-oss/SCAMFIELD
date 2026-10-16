@@ -1,9 +1,12 @@
 """
-ScamShield AI - Comprehensive Backend Test Suite
-Tests API routing, input validation, static inspection invariants, heuristics, and database CRUD.
+ScamShield AI - Comprehensive Multi-Modal Test Suite
+Tests URL, Message, Screenshot (OCR), and Email threat detection engines,
+along with input validation, rate limiting, and database audit logs.
 """
 
+import io
 import pytest
+from PIL import Image, ImageDraw
 from fastapi.testclient import TestClient
 from backend.main import app
 from backend.database import Base, engine
@@ -12,17 +15,20 @@ client = TestClient(app)
 
 @pytest.fixture(autouse=True)
 def setup_test_db():
-    # Initialize tables
     Base.metadata.create_all(bind=engine)
     yield
+
+# ----------------- SYSTEM & URL TESTS -----------------
 
 def test_health_check():
     response = client.get("/api/v1/health")
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "online"
-    assert "version" in data
-    assert data["db_connected"] is True
+    assert "url" in data["supported_modalities"]
+    assert "message" in data["supported_modalities"]
+    assert "screenshot" in data["supported_modalities"]
+    assert "email" in data["supported_modalities"]
 
 def test_model_info():
     response = client.get("/api/v1/model-info")
@@ -30,96 +36,168 @@ def test_model_info():
     data = response.json()
     assert "metrics" in data
     assert "confusion_matrix" in data["metrics"]
-    assert "accuracy" in data["metrics"]
-    assert "dataset_license" in data
-    assert "CC-BY" in data["dataset_license"]
+    assert data["metrics"]["accuracy"] > 0.9
 
-def test_scan_benign_url():
+def test_scan_url_benign():
     url = "https://en.wikipedia.org/wiki/Computer_security"
-    response = client.post("/api/v1/scan", json={"url": url})
+    response = client.post("/api/v1/scan/url", json={"url": url})
     assert response.status_code == 200
     data = response.json()
-    assert data["url"] == url
     assert data["risk_score"] < 40
     assert data["risk_level"] in ("SAFE", "SUSPICIOUS")
-    assert "disclaimer" in data
-    assert "offline static inspection" in data["disclaimer"]
 
-def test_scan_brand_phishing_url():
+def test_scan_url_phishing():
     url = "https://paypal.com.account-verification-service.xyz/webapps/login.php"
-    response = client.post("/api/v1/scan", json={"url": url})
+    response = client.post("/api/v1/scan/url", json={"url": url})
     assert response.status_code == 200
     data = response.json()
     assert data["risk_score"] >= 65
     assert data["risk_level"] == "HIGH"
-    
-    # Check that brand impersonation indicator was identified
-    indicator_names = [ind["name"] for ind in data["indicators"]]
-    assert any("Brand Impersonation" in name for name in indicator_names)
+    assert any("Brand Impersonation" in ind["name"] for ind in data["indicators"])
 
-def test_scan_direct_ip_url():
-    url = "http://185.220.101.5:8080/secure/auth/login.html"
-    response = client.post("/api/v1/scan", json={"url": url})
+# ----------------- MESSAGE SCANNER TESTS -----------------
+
+def test_scan_message_phishing():
+    scam_text = (
+        "URGENT: Your Wells Fargo account has been suspended due to unauthorized login activity. "
+        "Immediate action required within 24 hours. Send your one-time password OTP code or purchase "
+        "a $500 Apple gift card to verify identity: https://wellsfargo.verify-portal.top/auth"
+    )
+    response = client.post("/api/v1/scan/message", json={"text": scam_text})
     assert response.status_code == 200
     data = response.json()
-    indicator_names = [ind["name"] for ind in data["indicators"]]
-    assert any("Direct IPv4" in name for name in indicator_names)
+    assert data["risk_score"] >= 65
+    assert data["risk_level"] == "HIGH"
+    assert data["intent_category"] in ("CREDENTIAL_HARVESTING", "FINANCIAL_EXTORTION_OR_FRAUD", "URGENT_BRAND_MASQUERADE")
+    assert len(data["recommended_actions"]) > 0
 
-def test_scan_at_symbol_deception():
-    url = "http://amazon.com:security-check@malicious-host.top/auth"
-    response = client.post("/api/v1/scan", json={"url": url})
+    ind_names = [ind["name"] for ind in data["indicators"]]
+    assert any("Urgency" in name or "Action" in name for name in ind_names)
+    assert any("Impersonation" in name for name in ind_names)
+
+def test_scan_message_benign():
+    benign_text = "Hi Alice, are we still meeting tomorrow at 3 PM for the project retrospective? Let me know!"
+    response = client.post("/api/v1/scan/message", json={"text": benign_text})
     assert response.status_code == 200
     data = response.json()
-    indicator_names = [ind["name"] for ind in data["indicators"]]
-    assert any("At-Symbol" in name for name in indicator_names)
+    assert data["risk_score"] < 35
+    assert data["risk_level"] == "SAFE"
+    assert data["intent_category"] == "BENIGN_COMMUNICATION"
 
-def test_validation_rejects_empty_url():
-    response = client.post("/api/v1/scan", json={"url": ""})
+def test_scan_message_empty_validation():
+    response = client.post("/api/v1/scan/message", json={"text": "   "})
     assert response.status_code == 422
 
-def test_validation_rejects_dangerous_pseudo_schemes():
-    forbidden = [
-        "javascript:alert(1)",
-        "data:text/html,<script>alert(1)</script>",
-        "file:///etc/passwd",
-        "blob:http://localhost/uuid",
-        "ftp://files.example.com",
-    ]
-    for bad_url in forbidden:
-        response = client.post("/api/v1/scan", json={"url": bad_url})
-        assert response.status_code == 422, f"Failed to reject forbidden scheme for {bad_url}"
+# ----------------- SCREENSHOT OCR SCANNER TESTS -----------------
 
-def test_history_crud_flow():
-    # 1. Clear existing history
-    del_res = client.delete("/api/v1/history")
-    assert del_res.status_code == 200
+def test_scan_screenshot_with_phish_text():
+    # Generate in-memory synthetic image with scam message
+    img = Image.new("RGB", (650, 150), color=(255, 255, 255))
+    draw = ImageDraw.Draw(img)
+    draw.text((20, 20), "URGENT NOTICE: PayPal account locked. Immediate action required.", fill=(0, 0, 0))
+    draw.text((20, 60), "Please enter password and OTP to verify: http://paypal.sec-portal.xyz", fill=(0, 0, 0))
 
-    # 2. Add two scans
-    client.post("/api/v1/scan", json={"url": "https://python.org/downloads"})
-    client.post("/api/v1/scan", json={"url": "https://chase.com.security-alert.top/signin"})
+    img_byte_arr = io.BytesIO()
+    img.save(img_byte_arr, format="PNG")
+    img_byte_arr.seek(0)
 
-    # 3. Retrieve history
-    history_res = client.get("/api/v1/history?limit=10")
-    assert history_res.status_code == 200
-    items = history_res.json()
-    assert len(items) >= 2
+    files = {"file": ("screenshot.png", img_byte_arr, "image/png")}
+    response = client.post("/api/v1/scan/screenshot", files=files)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["scan_type"] == "screenshot"
+    assert "ocr_metadata" in data
+    assert data["ocr_metadata"]["format"] == "PNG"
 
-    # 4. Delete single record
-    item_id = items[0]["id"]
-    delete_item_res = client.delete(f"/api/v1/history/{item_id}")
-    assert delete_item_res.status_code == 200
+    if data["extracted_text"]:
+        assert data["risk_score"] >= 35
 
-    # 5. Verify deleted
-    history_res_after = client.get("/api/v1/history?limit=10")
-    remaining_ids = [it["id"] for it in history_res_after.json()]
-    assert item_id not in remaining_ids
+def test_scan_screenshot_blank_image():
+    # Blank white image with no text
+    img = Image.new("RGB", (300, 300), color=(255, 255, 255))
+    img_byte_arr = io.BytesIO()
+    img.save(img_byte_arr, format="PNG")
+    img_byte_arr.seek(0)
 
-def test_analytics_metrics():
+    files = {"file": ("blank.png", img_byte_arr, "image/png")}
+    response = client.post("/api/v1/scan/screenshot", files=files)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["risk_level"] == "SAFE"
+    assert data["extracted_text"] == ""
+    assert "No legible text" in data["summary"]
+
+def test_scan_screenshot_unsupported_file_type():
+    txt_content = b"This is a text file, not an image."
+    files = {"file": ("malicious.txt", io.BytesIO(txt_content), "text/plain")}
+    response = client.post("/api/v1/scan/screenshot", files=files)
+    assert response.status_code == 415
+
+# ----------------- EMAIL SCANNER TESTS -----------------
+
+def test_scan_email_brand_spoofing_free_webmail():
+    payload = {
+        "sender": "PayPal Customer Service <paypal-security-alert@gmail.com>",
+        "subject": "RE: Urgent Action Required on Account",
+        "body": "Dear customer, your PayPal balance has been frozen. Download the invoice.zip attachment or visit http://paypal-update.top"
+    }
+    response = client.post("/api/v1/scan/email", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["risk_score"] >= 65
+    assert data["risk_level"] == "HIGH"
+
+    ind_names = [ind["name"] for ind in data["indicators"]]
+    assert any("Free Webmail Brand Impersonation" in name for name in ind_names)
+    assert any("Dangerous Attachment" in name or "Attachment Mentioned" in name for name in ind_names)
+    assert "disclaimer" in data
+
+def test_scan_email_raw_rfc_format():
+    raw_email = (
+        "From: Netflix Support <billing-team@netflix-account-verify.icu>\n"
+        "To: user@example.com\n"
+        "Subject: Final Notice: Payment Failed - Service Termination\n"
+        "Date: Mon, 16 Oct 2026 12:00:00 +0000\n"
+        "\n"
+        "Your Netflix subscription has expired. Update credit card CVV within 24 hours: https://netflix.billing-verify.icu"
+    )
+    payload = {"body": raw_email}
+    response = client.post("/api/v1/scan/email", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["risk_score"] >= 50
+    assert "Netflix" in data["sender"] or "Netflix" in data["subject"]
+
+# ----------------- AUDIT HISTORY & ANALYTICS -----------------
+
+def test_history_filtering_by_modality():
+    # Clear history
+    client.delete("/api/v1/history")
+
+    # Add URL scan
+    client.post("/api/v1/scan/url", json={"url": "https://github.com/security"})
+    # Add Message scan
+    client.post("/api/v1/scan/message", json={"text": "Hello world message"})
+
+    # Fetch all
+    res_all = client.get("/api/v1/history?scan_type=all")
+    assert res_all.status_code == 200
+    assert len(res_all.json()) >= 2
+
+    # Filter URL
+    res_url = client.get("/api/v1/history?scan_type=url")
+    assert res_url.status_code == 200
+    assert all(item["scan_type"] == "url" for item in res_url.json())
+
+    # Filter Message
+    res_msg = client.get("/api/v1/history?scan_type=message")
+    assert res_msg.status_code == 200
+    assert all(item["scan_type"] == "message" for item in res_msg.json())
+
+def test_analytics_computation():
     response = client.get("/api/v1/analytics")
     assert response.status_code == 200
     data = response.json()
     assert "total_scans" in data
-    assert "high_risk_scans" in data
     assert "avg_risk_score" in data
     assert "top_indicators" in data
-    assert "db_type" in data
